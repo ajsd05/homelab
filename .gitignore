@@ -1,0 +1,25 @@
+# Secrets — never commit
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+.env
+*secret*
+*credential*
+*password*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Ansible
+*.retry
+vault-password*
+
+# Local noise
+.DS_Store
+*.swp
+*~
