@@ -41,6 +41,21 @@ develops, and it's invisible in a git log.
 
 <!-- Newest first. Add above this line's successor, below the heading. -->
 
+## 2026-09-02 - Documentation is live
+**Did:** Setup github repo and git in WSL. 
+
+**Why:** I wanted to document my homelab progress in some way. I thought the best way was a journal. 
+
+**Broke:** N/A
+
+**Thought it was:**N/A
+
+**Actually was:** N/A
+
+**Time lost:**N/A
+
+**Next:** I want to setup a VPN for my ProxMox server so I can access and work on it remotely.
+
 ## 2026-09-02 — Hardware audit and context rebuild
 
 **Did:** Ran a full hardware inventory on the Proxmox node. Rewrote the context document
