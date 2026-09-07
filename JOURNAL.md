@@ -15,6 +15,97 @@ entry. The value is in the unbroken record, not in any single line.
 
 <!-- Newest first. Add above this line's successor, below the heading. -->
 
+## 2026-09-06 — Wiped and mounted the FireCuda as lab storage
+
+**What I did:** 
+- Took the 2 TB into Proxmox host. Identified it as `/dev/sda` with
+`lsblk -o NAME,SIZE,TYPE,TRAN,MODEL,FSTYPE,MOUNTPOINT`
+- wiped the old NTFS partition table with `wipefs -a`
+- wrote a GPT table and one full-disk partition with `parted`, formatted it
+ext4 with `mkfs.ext4 -L media`
+- mounted it at `/mnt/media`, and added an fstab entry keyed on the filesystem UUID with `nofail`.
+- Tested the fstab line with `umount` + `mount -a` rather than by rebooting, then ran `systemctl daemon-reload`.
+
+**Why:** I need storage for a Jellyfin library, and the obvious option carving space out of
+the LVM thin pool is the wrong one. It would put my biggest, least valuable data on my most
+constrained and least protected storage, competing with every future VM for the same 794 GB,
+on a single disk with no backup. A second physical drive solves the media problem *and* gives
+me somewhere to write Proxmox backups that isn't the disk being backed up. One drive I
+already owned, two gaps closed.
+
+**What broke / what surprised me:**
+
+- `parted` wasn't installed. `command not found` — Proxmox ships a fairly minimal Debian.
+  Nothing was broken; I just needed `apt install parted`.
+- I ran `wipefs -a` before running the read-only `wipefs` preview. Wrong order. It worked out
+  because the path was right, but a preview is worthless after the fact.
+- After creating the new partition, `lsblk` still reported `FSTYPE=ntfs` on `sda1`, which
+  looked like the wipe had failed. It hadn't. `wipefs` erased the *partition table* (2 bytes,
+  `55 aa`, at offset 0x1fe); the NTFS metadata was inside the old `sda1`, which stopped
+  existing the moment the table died, so those bytes were never touched. My new partition
+  starts at nearly the same offset, so `lsblk` read the stale signature and honestly reported
+  what it saw. `mkfs.ext4` then warned me the partition "contains a ntfs file system labelled
+  'Seagate'" — which was actually useful, because that Windows label was a fifth independent
+  confirmation I was on the right disk.
+- `mount -a` printed a hint that systemd was still using the old fstab. Not an error — the
+  mount worked. systemd parses fstab at boot and *generates* mount units from it, so editing
+  the file by hand leaves those units stale until `systemctl daemon-reload`.
+
+**What I learned:**
+
+- **Disk vs partition.** `/dev/sda` is the whole physical disk; `/dev/sda1` is a declared
+  region inside it. The partition table at the front of the disk is the map saying which
+  regions exist. You wipe the disk to destroy the map; you format the partition to create a
+  filesystem inside one region. I got this backwards when asked and would have wiped the wrong
+  thing.
+- **Partition vs filesystem.** A partition says *where*; a filesystem says *how it's
+  organized* — the structure tracking files, directories, permissions, and which blocks hold
+  which bytes. Two separate steps, `parted` then `mkfs`.
+- **GPT vs MBR.** GPT is the modern partition table format. MBR can't address past 2 TB and
+  caps at four primary partitions. My drive is exactly at that boundary, so GPT.
+- **Removing the pointer to data isn't removing the data.** This is why "deleted" files are
+  recoverable, why a quick format takes a second and a full one takes hours, and why I would
+  not hand this drive to a stranger after only doing what I did.
+- **Mounting.** Windows gives each filesystem a letter. Linux has one tree from `/`, and a
+  filesystem gets attached to a directory inside it — that's a mount, and the directory is
+  the mount point. After mounting, `/mnt/media` is a doorway into the FireCuda, not a folder
+  on the NVMe.
+- **The shadowing trap.** If I write files into `/mnt/media` while nothing is mounted there,
+  they land on `pve-root` (96 GB) and then become invisible once the real drive mounts over
+  the top. Not deleted — shadowed, and still eating my system partition. Check `df -h` before
+  writing.
+- **Mount by UUID, not `/dev/sda1`.** Device names are handed out in the order the kernel
+  finds disks, so they shuffle when hardware changes. The filesystem UUID is written inside
+  the filesystem and travels with it.
+- **`nofail` is mandatory for a USB disk in fstab.** Without it, a disk that's unplugged or
+  slow to spin up can drop the host into an emergency shell at boot — and a ThinkCentre Tiny
+  has no iDRAC/iLO, so that means walking over with a keyboard and monitor.
+- **`mount -a` is the dry run for a reboot.** Test fstab at a shell with the machine still up,
+  not by rebooting and hoping.
+- **ext4's journal** logs intended changes before making them, so an interruption leaves the
+  filesystem repairable. It protects the filesystem's structure, not the contents of the file
+  being written — which matters because I have no UPS and every power flicker is a hard cut.
+- **Superblock backups.** The superblock is the master record describing the filesystem; lose
+  it and the disk is unreadable even though every byte is still there. ext4 scatters copies
+  across the disk, and `mkfs` printed their block numbers. That's what you point `fsck` at.
+- **Inodes** are per-file metadata records, allocated at a fixed count when the filesystem is
+  created. A filesystem can run out of inodes while showing free space.
+- **A `(y,N)` prompt with a capital N defaults to no.** Tools that can destroy data are built
+  that way.
+- I also had the rule for this drive backwards at first. I said "only re-downloadable stuff,
+  nothing important." The real axis isn't important vs unimportant, it's **is this the only
+  copy?** Backups belong on this drive precisely *because* they're second copies — that's the
+  mitigation, not the risk. What doesn't belong is anything whose only copy would live here.
+
+**New terms:** partition table, GPT vs MBR, filesystem, ext4, journal, superblock (and
+superblock backups), inode, mount / mount point, fstab, UUID vs PARTUUID, filesystem label,
+`nofail`, systemd generated mount units.
+
+**Next step:** Create `/mnt/media/library` and `/mnt/media/backups`, then register `/mnt/media`
+with Proxmox as a storage target — the mount alone doesn't close the backup gap; PVE has to be
+told the storage exists. After that, one reboot test proves three things at once: LXC 101's
+`onboot`, the fstab mount, and remote access from cellular. Then the Jellyfin container.
+
 ## 2026-09-06 - Set up Tailscale reboot-safe before standing up any server
 **Did:**
 - pct config 101 and found no onboot line
