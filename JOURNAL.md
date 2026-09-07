@@ -11,35 +11,19 @@ entry. The value is in the unbroken record, not in any single line.
 
 ---
 
-## Format
-
-```markdown
-## YYYY-MM-DD — Short title
-
-**Did:** what changed, in a sentence or two.
-
-**Why:** the reason, if it isn't obvious.
-
-**Broke:** what went wrong, if anything.
-
-**Thought it was:** the initial diagnosis.
-
-**Actually was:** the real cause.
-
-**Time lost:** rough duration between "something is wrong" and "it is fixed."
-
-**Next:** anything this created or exposed.
-```
-
-Drop any field that doesn't apply. The `thought it was` / `actually was` pair is the
-important one — the gap between those two lines is the record of how diagnostic instinct
-develops, and it's invisible in a git log.
-
----
-
 # Entries
 
 <!-- Newest first. Add above this line's successor, below the heading. -->
+
+## 2026-09-06 - Set up Tailscale reboot-safe before standing up any server
+**Did:**
+- pct config 101 and found no onboot line
+- Set it with pct set 101 -onboot 1
+- Ran pct listsnapshot 101 — only current; no snapshots existed, took one named tailscale-working.
+
+**Why:**
+- Setting up a new service on Proxmox will eventually lead to a reboot, and we want all our data to be saved if I am working remotely
+- This saves the hassle of having to go back into the server to restart any container.
 
 ## 2026-09-02 - Set up Tailscale subnet router in a linux container
 **Did:** 
